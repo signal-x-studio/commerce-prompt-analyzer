@@ -1,0 +1,5 @@
+{
+  "name": "E-commerce Prompt Generator",
+  "description": "An application that takes an e-commerce category URL, analyzes its potential catalog structure, and generates a list of search prompts a customer might use in an answer engine like Gemini.",
+  "requestFramePermissions": []
+}
