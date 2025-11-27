@@ -1,29 +1,46 @@
-import React, { useState, useCallback, useMemo } from 'react';
-import { Header } from './components/Header';
-import { UrlInputForm } from './components/UrlInputForm';
-import { LoadingSpinner } from './components/LoadingSpinner';
-import { ResultsDisplay } from './components/ResultsDisplay';
-import { LogOutput } from './components/LogOutput';
-import { TestResultsSummary } from './components/TestResultsSummary';
-import { TestInfo } from './components/TestInfo';
-import { EngineSelector } from './components/EngineSelector';
-import { generatePromptsFromUrl, testPromptAnswerability } from './services/geminiService';
-import { GenerationResult, TestResult, CategoryPrompts, EngineId, ENGINES } from './types';
+'use client';
 
-const App: React.FC = () => {
-  const [url, setUrl] = useState<string>('');
+import React, { useState, useCallback, useMemo, useRef } from 'react';
+import { Header } from '../components/Header';
+import { UrlInputForm } from '../components/UrlInputForm';
+import { LoadingSpinner } from '../components/LoadingSpinner';
+import { ResultsDisplay } from '../components/ResultsDisplay';
+import { LogOutput } from '../components/LogOutput';
+import { TestResultsSummary } from '../components/TestResultsSummary';
+import { TestInfo } from '../components/TestInfo';
+import { EngineSelector } from '../components/EngineSelector';
+import { generatePromptsFromUrl, testPromptAnswerability } from '../services/geminiService';
+import { GenerationResult, TestResult, EngineId, ENGINES } from '../types';
+import { useCost } from '../context/CostContext';
+
+import { useLocalStorage } from '../hooks/useLocalStorage';
+
+import { ProgressBar } from '../components/ProgressBar';
+import { calculateEstimatedCost } from '../utils/costCalculator';
+
+export default function Home() {
+  const abortControllerRef = useRef<AbortController | null>(null);
+  const [url, setUrl] = useLocalStorage<string>('cpa_url', '');
   const [loading, setLoading] = useState<boolean>(false);
   const [isTesting, setIsTesting] = useState<boolean>(false);
   const [testingPrompts, setTestingPrompts] = useState<Set<string>>(new Set());
   const [loadingStep, setLoadingStep] = useState<string>('');
   const [error, setError] = useState<string | null>(null);
-  const [generationResult, setGenerationResult] = useState<GenerationResult | null>(null);
-  const [testResults, setTestResults] = useState<Record<string, Partial<Record<EngineId, TestResult>>>>({});
+  const [generationResult, setGenerationResult] = useLocalStorage<GenerationResult | null>('cpa_generationResult', null);
+  const [testResults, setTestResults] = useLocalStorage<Record<string, Partial<Record<EngineId, TestResult>>>>('cpa_testResults', {});
   const [selectedEngines, setSelectedEngines] = useState<Set<EngineId>>(new Set(['gemini_grounded']));
+  const [useMockData, setUseMockData] = useLocalStorage<boolean>('cpa_useMockData', false);
+  const [completedTests, setCompletedTests] = useState<number>(0);
+  
+  const { trackUsage } = useCost();
 
   const allPrompts = useMemo(() => {
     return generationResult?.promptsByCategory.flatMap(p => p.prompts) ?? [];
   }, [generationResult]);
+
+  const estimatedCost = useMemo(() => {
+    return calculateEstimatedCost(allPrompts.length, selectedEngines.size);
+  }, [allPrompts.length, selectedEngines.size]);
 
   const handleEngineChange = (engineId: EngineId) => {
     setSelectedEngines(prev => {
@@ -52,7 +69,7 @@ const App: React.FC = () => {
     
     try {
       setLoadingStep('Analyzing category structure...');
-      const generatedResults = await generatePromptsFromUrl(url, (step) => setLoadingStep(step));
+      const generatedResults = await generatePromptsFromUrl(url, (step) => setLoadingStep(step), useMockData, trackUsage);
       setGenerationResult(generatedResults);
     } catch (err) {
       console.error(err);
@@ -61,7 +78,7 @@ const App: React.FC = () => {
       setLoading(false);
       setLoadingStep('');
     }
-  }, [url]);
+  }, [url, useMockData, trackUsage]);
 
   const handleRunTests = useCallback(async () => {
     if (!generationResult || !url || selectedEngines.size === 0) return;
@@ -77,26 +94,55 @@ const App: React.FC = () => {
     setTestResults(initialResults);
 
     try {
+        abortControllerRef.current = new AbortController();
+        setCompletedTests(0);
+        const tasks: Array<() => Promise<void>> = [];
+
         for (const prompt of allPrompts) {
             for (const engineId of selectedEngines) {
-                const engine = ENGINES[engineId];
-                const result = await testPromptAnswerability(prompt, url, engine);
-                setTestResults(prev => ({
-                    ...prev,
-                    [prompt]: {
-                        ...prev[prompt],
-                        [engineId]: result,
-                    }
-                }));
+                tasks.push(async () => {
+                    if (abortControllerRef.current?.signal.aborted) return;
+                    const engine = ENGINES[engineId];
+                    const result = await testPromptAnswerability(prompt, url, engine, useMockData, trackUsage);
+                    if (abortControllerRef.current?.signal.aborted) return;
+                    
+                    setCompletedTests(prev => prev + 1);
+                    setTestResults(prev => ({
+                        ...prev,
+                        [prompt]: {
+                            ...prev[prompt],
+                            [engineId]: result,
+                        }
+                    }));
+                });
             }
         }
+
+        // Simple concurrency limiter (batch size = 1 to avoid rate limits)
+        const BATCH_SIZE = 1;
+        for (let i = 0; i < tasks.length; i += BATCH_SIZE) {
+            if (abortControllerRef.current?.signal.aborted) {
+                break;
+            }
+            const batch = tasks.slice(i, i + BATCH_SIZE);
+            await Promise.all(batch.map(task => task()));
+        }
+
     } catch (err) {
         console.error(err);
         setError(err instanceof Error ? err.message : 'An error occurred during testing.');
     } finally {
         setIsTesting(false);
+        abortControllerRef.current = null;
     }
-  }, [generationResult, url, allPrompts, selectedEngines]);
+  }, [generationResult, url, allPrompts, selectedEngines, useMockData, trackUsage]);
+
+  const handleStopTests = useCallback(() => {
+    if (abortControllerRef.current) {
+        abortControllerRef.current.abort();
+    }
+    // We don't manually set isTesting(false) here because the loop break will trigger the finally block
+  }, []);
 
   const handleRunSingleTest = useCallback(async (prompt: string) => {
     if (!url || selectedEngines.size === 0) return;
@@ -118,7 +164,7 @@ const App: React.FC = () => {
     try {
         for (const engineId of selectedEngines) {
             const engine = ENGINES[engineId];
-            const result = await testPromptAnswerability(prompt, url, engine);
+            const result = await testPromptAnswerability(prompt, url, engine, useMockData, trackUsage);
             setTestResults(prev => ({
                 ...prev,
                 [prompt]: {
@@ -137,7 +183,7 @@ const App: React.FC = () => {
             return newSet;
         });
     }
-  }, [url, selectedEngines]);
+  }, [url, selectedEngines, useMockData, trackUsage]);
 
 
   const hasTestResults = Object.keys(testResults).length > 0;
@@ -148,6 +194,19 @@ const App: React.FC = () => {
         <Header />
         
         <main className="mt-8">
+          <div className="flex justify-end mb-4">
+             <label className="inline-flex items-center cursor-pointer">
+                <input 
+                    type="checkbox" 
+                    className="sr-only peer" 
+                    checked={useMockData}
+                    onChange={(e) => setUseMockData(e.target.checked)}
+                />
+                <div className="relative w-11 h-6 bg-slate-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 rounded-full peer peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
+                <span className="ms-3 text-sm font-medium text-slate-700">Mock Mode (No Cost)</span>
+            </label>
+          </div>
+
           <UrlInputForm
             url={url}
             setUrl={setUrl}
@@ -170,21 +229,39 @@ const App: React.FC = () => {
                  <h2 className="text-2xl font-bold text-slate-700 pb-2 border-b-2 border-slate-200 sm:border-b-0">
                   Generated Customer Prompts
                 </h2>
-                <button
-                    onClick={handleRunTests}
-                    disabled={isTesting || selectedEngines.size === 0}
-                    className="flex items-center justify-center px-6 py-2.5 bg-green-600 text-white font-semibold rounded-lg shadow-md hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 disabled:bg-green-300 disabled:cursor-wait transition-all duration-300"
-                >
-                   {isTesting ? (
-                       <>
-                        <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                        </svg>
-                        Testing All...
-                       </>
-                   ) : 'Test All Prompts'}
-                </button>
+                <div className="flex flex-col items-end gap-1 w-full sm:w-auto">
+                    {isTesting ? (
+                        <div className="w-full sm:w-64 flex flex-col gap-2">
+                            <ProgressBar current={completedTests} total={allPrompts.length * selectedEngines.size} label="Testing Progress" />
+                            <button 
+                                onClick={handleStopTests}
+                                className="text-xs text-red-600 hover:text-red-800 font-medium self-end hover:underline"
+                            >
+                                Stop Testing
+                            </button>
+                        </div>
+                    ) : (
+                        <>
+                            <button
+                                onClick={handleRunTests}
+                                disabled={isTesting || selectedEngines.size === 0}
+                                className="flex items-center justify-center px-6 py-2.5 bg-green-600 text-white font-semibold rounded-lg shadow-md hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 disabled:bg-green-300 disabled:cursor-wait transition-all duration-300"
+                            >
+                            Test All Prompts
+                            </button>
+                            {estimatedCost > 0 && !useMockData && (
+                                <span className="text-xs text-slate-500 font-medium">
+                                    Est. Cost: ~${estimatedCost.toFixed(4)}
+                                </span>
+                            )}
+                            {useMockData && (
+                                <span className="text-xs text-green-600 font-medium">
+                                    Est. Cost: $0.0000 (Mock)
+                                </span>
+                            )}
+                        </>
+                    )}
+                </div>
                </div>
               
               <EngineSelector 
@@ -226,6 +303,4 @@ const App: React.FC = () => {
       </div>
     </div>
   );
-};
-
-export default App;
+}

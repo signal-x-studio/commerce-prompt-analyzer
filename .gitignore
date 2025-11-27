@@ -11,6 +11,13 @@ node_modules
 dist
 dist-ssr
 *.local
+.env
+.next/
+out/
+build/
+verify_sdk.ts
+*.tsbuildinfo
+ecommerce-scraper/
 
 # Editor directories and files
 .vscode/*

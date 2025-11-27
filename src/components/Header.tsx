@@ -1,4 +1,5 @@
 import React from 'react';
+import { CostDisplay } from './CostDisplay';
 
 const Logo: React.FC = () => (
   <div className="flex items-center justify-center w-16 h-16 bg-gradient-to-br from-violet-500 to-indigo-600 rounded-2xl shadow-lg transform -rotate-12">
@@ -13,7 +14,10 @@ const Logo: React.FC = () => (
 
 export const Header: React.FC = () => {
   return (
-    <header className="text-center">
+    <header className="text-center relative">
+      <div className="absolute top-0 right-0">
+        <CostDisplay />
+      </div>
       <div className="flex justify-center mb-4">
         <Logo />
       </div>
