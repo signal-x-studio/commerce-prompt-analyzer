@@ -1,10 +1,11 @@
-import type { Metadata } from 'next';
-import './globals.css';
-import { CostProvider } from '../context/CostContext';
+import type { Metadata } from "next";
+import { SiteFooter } from "../components/SiteFooter";
+import { CostProvider } from "../context/CostContext";
+import "./globals.css";
 
 export const metadata: Metadata = {
-  title: 'Commerce Prompt Analyzer',
-  description: 'Analyze and optimize your e-commerce AEO strategy.',
+  title: "Commerce Prompt Analyzer",
+  description: "Analyze and optimize your e-commerce AEO strategy.",
 };
 
 export default function RootLayout({
@@ -13,10 +14,14 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="en">
-      <body className="bg-slate-50">
+    <html lang="en" suppressHydrationWarning>
+      <body
+        className="bg-slate-50 min-h-screen flex flex-col"
+        suppressHydrationWarning
+      >
         <CostProvider>
-          {children}
+          <div className="flex-1">{children}</div>
+          <SiteFooter />
         </CostProvider>
       </body>
     </html>

@@ -1,35 +1,76 @@
-import { GoogleGenAI, Type } from '@google/genai';
-import { NextResponse } from 'next/server';
+import { GoogleGenAI, Type } from "@google/genai";
+import { NextResponse } from "next/server";
+import { generateStructureRequestSchema } from "../../../lib/security/validators";
+import {
+  validateUrlForSSRF,
+  sanitizeUrlForPrompt,
+} from "../../../lib/security/ssrf-guard";
+import { getGeminiKey } from "../../../lib/security/api-keys";
 
-const API_KEY = process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY || process.env.API_KEY;
+// Lazy initialization of AI client
+let ai: GoogleGenAI | null = null;
 
-if (!API_KEY) {
-  throw new Error("API_KEY environment variable is not set");
+function getAI(): GoogleGenAI {
+  if (!ai) {
+    const apiKey = getGeminiKey();
+    ai = new GoogleGenAI({ apiKey });
+  }
+  return ai;
 }
-
-const ai = new GoogleGenAI({ apiKey: API_KEY });
 
 export async function POST(req: Request) {
   try {
-    const { url, mock } = await req.json();
-    if (mock) {
-        // Dynamic import to avoid loading mock data in production if not needed, 
-        // though for this size it doesn't matter much.
-        const { MOCK_STRUCTURE } = await import('../../../data/mockData');
-        // Simulate delay
-        await new Promise(resolve => setTimeout(resolve, 1500));
-        return NextResponse.json(MOCK_STRUCTURE);
+    const body = await req.json();
+
+    // Validate request with Zod schema
+    const parseResult = generateStructureRequestSchema.safeParse(body);
+    if (!parseResult.success) {
+      const errors = parseResult.error.issues.map((e) => ({
+        path: e.path.join("."),
+        message: e.message,
+      }));
+      return NextResponse.json(
+        {
+          error: "Validation Error",
+          message: "Invalid request",
+          details: errors,
+        },
+        { status: 400 }
+      );
     }
-    if (!url) return NextResponse.json({ error: 'URL is required' }, { status: 400 });
+
+    const { url, mock } = parseResult.data;
+
+    // Additional SSRF validation
+    const ssrfCheck = validateUrlForSSRF(url);
+    if (!ssrfCheck.valid) {
+      return NextResponse.json(
+        {
+          error: "URL Validation Error",
+          message: ssrfCheck.error,
+        },
+        { status: 400 }
+      );
+    }
+
+    if (mock) {
+      const { MOCK_STRUCTURE } = await import("../../../data/mockData");
+      await new Promise((resolve) => setTimeout(resolve, 1500));
+      return NextResponse.json(MOCK_STRUCTURE);
+    }
+
+    // Sanitize URL before embedding in prompt (removes query params, etc.)
+    const sanitizedUrl = sanitizeUrlForPrompt(url);
 
     const prompt = `
       As an e-commerce expert, analyze the following category landing page URL and infer its likely catalog structure.
       Consider potential subcategories, product types, and common filtering facets (e.g., brand, size, color, material, price range).
       Return this structure as a JSON object.
-      URL: ${url}
+      URL: ${sanitizedUrl}
     `;
 
-    const response = await ai.models.generateContent({
+    const aiClient = getAI();
+    const response = await aiClient.models.generateContent({
       model: "gemini-2.0-flash-exp",
       contents: prompt,
       config: {
@@ -37,11 +78,14 @@ export async function POST(req: Request) {
         responseSchema: {
           type: Type.OBJECT,
           properties: {
-            mainCategory: { type: Type.STRING, description: "The main category derived from the URL." },
+            mainCategory: {
+              type: Type.STRING,
+              description: "The main category derived from the URL.",
+            },
             subcategories: {
               type: Type.ARRAY,
               description: "A list of likely subcategories.",
-              items: { type: Type.STRING }
+              items: { type: Type.STRING },
             },
             facets: {
               type: Type.ARRAY,
@@ -49,29 +93,33 @@ export async function POST(req: Request) {
               items: {
                 type: Type.OBJECT,
                 properties: {
-                  name: { type: Type.STRING, description: "The name of the facet (e.g., 'Brand', 'Color')." },
+                  name: {
+                    type: Type.STRING,
+                    description: "The name of the facet (e.g., 'Brand', 'Color').",
+                  },
                   options: {
                     type: Type.ARRAY,
                     description: "Example options for the facet.",
-                    items: { type: Type.STRING }
-                  }
+                    items: { type: Type.STRING },
+                  },
                 },
-                required: ["name", "options"]
-              }
-            }
+                required: ["name", "options"],
+              },
+            },
           },
-          required: ["mainCategory", "subcategories", "facets"]
-        }
-      }
+          required: ["mainCategory", "subcategories", "facets"],
+        },
+      },
     });
 
-    const jsonText = response.text ? response.text.trim() : '{}';
+    const jsonText = response.text ? response.text.trim() : "{}";
     return NextResponse.json({
-        ...JSON.parse(jsonText),
-        usage: response.usageMetadata
+      ...JSON.parse(jsonText),
+      usage: response.usageMetadata,
     });
-  } catch (error) {
+  } catch (error: any) {
     console.error("Error generating catalog structure:", error);
-    return NextResponse.json({ error: "Failed to analyze website structure." }, { status: 500 });
+    const message = error?.message || "Failed to analyze website structure.";
+    return NextResponse.json({ error: message }, { status: 500 });
   }
 }
