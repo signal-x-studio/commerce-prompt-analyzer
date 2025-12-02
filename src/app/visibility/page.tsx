@@ -5,9 +5,11 @@ import Link from "next/link";
 import {
   LLM_MODELS,
   MODEL_PRESETS,
+  DEFAULT_ADVANCED_SETTINGS,
   type LLMModelId,
   type ModelPreset,
   type ExecutionMode,
+  type AdvancedAnalysisSettings,
 } from "../../types";
 import { useQueryDiscovery } from "../../hooks/useQueryDiscovery";
 import { useVisibilityTest } from "../../hooks/useVisibilityTest";
@@ -16,6 +18,8 @@ import { CostDisplay } from "../../components/CostDisplay";
 import { QueryResultCard } from "../../components/visibility/QueryResultCard";
 import { CostOptimizationTips } from "../../components/visibility/CostOptimizationTips";
 import { ApiKeyWarning } from "../../components/visibility/ApiKeyWarning";
+import { AdvancedSettingsPanel } from "../../components/visibility/AdvancedSettingsPanel";
+import { CoverageAnalysisPanel } from "../../components/visibility/CoverageAnalysisPanel";
 
 // ============================================
 // Main Page Component
@@ -41,6 +45,9 @@ export default function VisibilityPage() {
   const [selectedModelForExecution, setSelectedModelForExecution] = useState<LLMModelId | null>(null);
   const [selectedQueryForExecution, setSelectedQueryForExecution] = useState<string | null>(null);
   const [useMockMode, setUseMockMode] = useState(false);
+
+  // Advanced Settings (GEO Framework)
+  const [advancedSettings, setAdvancedSettings] = useState<AdvancedAnalysisSettings>(DEFAULT_ADVANCED_SETTINGS);
 
   // Budget tracking
   const { wouldExceedBudget, budgetLimit, budgetRemaining, budgetStatus } = useCost();
@@ -321,6 +328,42 @@ export default function VisibilityPage() {
                 </button>
               )}
 
+              {/* Content-Derived Queries (GEO Framework) */}
+              {advancedSettings.enableContentDerivedQueries && brandUrl && (
+                <button
+                  onClick={() => queryDiscovery.deriveFromContent(
+                    brandUrl,
+                    10,
+                    advancedSettings.enableMatchRateScoring
+                  )}
+                  disabled={queryDiscovery.isLoading || visibilityTest.isRunning}
+                  className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:bg-green-300 disabled:cursor-not-allowed transition-colors flex items-center gap-2"
+                >
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                  </svg>
+                  Derive from Content
+                </button>
+              )}
+
+              {/* Classify Queries Button (GEO Framework) */}
+              {(advancedSettings.enableIntentClassification || advancedSettings.enableFunnelStageMapping) &&
+                queryDiscovery.queries.length > 0 && (
+                <button
+                  onClick={() => queryDiscovery.classifyQueries(
+                    brandUrl || undefined,
+                    advancedSettings.enableMatchRateScoring
+                  )}
+                  disabled={queryDiscovery.isLoading || visibilityTest.isRunning}
+                  className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 disabled:bg-purple-300 disabled:cursor-not-allowed transition-colors flex items-center gap-2"
+                >
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
+                  </svg>
+                  Classify Queries
+                </button>
+              )}
+
               {queryDiscovery.queries.length > 0 && (
                 <>
                   <button
@@ -393,9 +436,28 @@ export default function VisibilityPage() {
                     />
                     <div className="flex-1 min-w-0">
                       <p className="text-sm text-slate-800 truncate">{query.text}</p>
-                      <p className="text-xs text-slate-500">
-                        {query.category} · {query.source.replace("-", " ")}
-                      </p>
+                      <div className="flex flex-wrap items-center gap-2 text-xs text-slate-500">
+                        <span>{query.category} · {query.source.replace("-", " ")}</span>
+                        {query.intent && (
+                          <span className="px-1.5 py-0.5 bg-blue-100 text-blue-700 rounded">
+                            {query.intent}
+                          </span>
+                        )}
+                        {query.funnelStage && (
+                          <span className="px-1.5 py-0.5 bg-purple-100 text-purple-700 rounded">
+                            {query.funnelStage}
+                          </span>
+                        )}
+                        {query.matchScore !== undefined && (
+                          <span className={`px-1.5 py-0.5 rounded ${
+                            query.matchScore >= 0.6 ? 'bg-green-100 text-green-700' :
+                            query.matchScore >= 0.3 ? 'bg-amber-100 text-amber-700' :
+                            'bg-red-100 text-red-700'
+                          }`}>
+                            {Math.round(query.matchScore * 100)}% match
+                          </span>
+                        )}
+                      </div>
                     </div>
                     <button
                       onClick={() => queryDiscovery.removeQuery(query.id)}
@@ -422,7 +484,39 @@ export default function VisibilityPage() {
             <p className="mt-3 text-sm text-slate-500">
               {queryDiscovery.selectedCount} of {queryDiscovery.queries.length} queries selected
             </p>
+
+            {/* Content Analysis Summary */}
+            {queryDiscovery.contentAnalysis && (
+              <div className="mt-4 p-3 bg-green-50 border border-green-200 rounded-lg">
+                <p className="text-sm font-medium text-green-800">
+                  Content Analysis: {queryDiscovery.contentAnalysis.pageType}
+                </p>
+                <p className="text-xs text-green-700 mt-1">
+                  {queryDiscovery.contentAnalysis.title} · {queryDiscovery.contentAnalysis.chunkCount} content chunks analyzed
+                </p>
+                {queryDiscovery.contentAnalysis.categories.length > 0 && (
+                  <p className="text-xs text-green-600 mt-1">
+                    Categories: {queryDiscovery.contentAnalysis.categories.slice(0, 5).join(", ")}
+                  </p>
+                )}
+              </div>
+            )}
           </section>
+
+          {/* Advanced Analysis Settings (GEO Framework) */}
+          <AdvancedSettingsPanel
+            settings={advancedSettings}
+            onSettingsChange={setAdvancedSettings}
+            disabled={visibilityTest.isRunning}
+          />
+
+          {/* Coverage Analysis - Show when queries have classification */}
+          {advancedSettings.enableCoverageAnalysis &&
+            queryDiscovery.queries.some((q) => q.intent || q.funnelStage) && (
+            <CoverageAnalysisPanel
+              queries={queryDiscovery.queries}
+            />
+          )}
 
           {/* Section 3: Model Selection */}
           <section className="bg-white rounded-xl shadow-sm border border-slate-200 p-6">

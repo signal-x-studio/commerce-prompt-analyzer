@@ -2,6 +2,7 @@
  * Query Suggestion API
  *
  * Generates relevant queries for visibility testing using AI or templates.
+ * Enhanced with GEO Framework for content-derived queries and classification.
  */
 
 import { NextRequest, NextResponse } from "next/server";
@@ -10,6 +11,10 @@ import {
   suggestQueriesWithAI,
   getIndustryTemplateQueries,
   getAvailableIndustries,
+  analyzePageContent,
+  deriveQueriesFromContent,
+  classifyQueries,
+  scoreQueriesAgainstContent,
 } from "../../../../services/queryDiscoveryService";
 
 // ============================================
@@ -17,11 +22,21 @@ import {
 // ============================================
 
 const suggestRequestSchema = z.object({
-  method: z.enum(["ai", "template"]),
+  method: z.enum(["ai", "template", "content-derived", "classify"]),
   brandUrl: z.string().url().optional(),
   brandName: z.string().optional(),
   industry: z.string().optional(),
   count: z.number().min(1).max(20).optional().default(10),
+  // For classify method
+  queries: z.array(z.object({
+    id: z.string(),
+    text: z.string(),
+    source: z.string(),
+    category: z.string().optional(),
+    selected: z.boolean(),
+  })).optional(),
+  // For scoring
+  enableMatchRateScoring: z.boolean().optional().default(false),
 });
 
 // ============================================
@@ -49,8 +64,9 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const { method, brandUrl, brandName, industry, count } = parseResult.data;
+    const { method, brandUrl, brandName, industry, count, queries, enableMatchRateScoring } = parseResult.data;
 
+    // Method: AI suggestions (existing)
     if (method === "ai") {
       if (!brandUrl) {
         return NextResponse.json(
@@ -59,10 +75,11 @@ export async function POST(request: NextRequest) {
         );
       }
 
-      const queries = await suggestQueriesWithAI(brandUrl, brandName, industry, count);
-      return NextResponse.json({ queries });
+      const generatedQueries = await suggestQueriesWithAI(brandUrl, brandName, industry, count);
+      return NextResponse.json({ queries: generatedQueries });
     }
 
+    // Method: Industry templates (existing)
     if (method === "template") {
       if (!industry) {
         return NextResponse.json(
@@ -71,8 +88,75 @@ export async function POST(request: NextRequest) {
         );
       }
 
-      const queries = getIndustryTemplateQueries(industry);
-      return NextResponse.json({ queries });
+      const templateQueries = getIndustryTemplateQueries(industry);
+      return NextResponse.json({ queries: templateQueries });
+    }
+
+    // Method: Content-derived queries (GEO Framework - NEW)
+    if (method === "content-derived") {
+      if (!brandUrl) {
+        return NextResponse.json(
+          { error: "brandUrl is required for content-derived queries" },
+          { status: 400 }
+        );
+      }
+
+      // Analyze the page content
+      const contentAnalysis = await analyzePageContent(brandUrl);
+      if (!contentAnalysis) {
+        return NextResponse.json(
+          { error: "Failed to analyze page content" },
+          { status: 500 }
+        );
+      }
+
+      // Derive queries from content
+      const derivedQueries = await deriveQueriesFromContent(contentAnalysis, count);
+
+      // Optionally score against content
+      let finalQueries = derivedQueries;
+      if (enableMatchRateScoring) {
+        finalQueries = scoreQueriesAgainstContent(derivedQueries, contentAnalysis);
+      }
+
+      return NextResponse.json({
+        queries: finalQueries,
+        contentAnalysis: {
+          pageType: contentAnalysis.pageType,
+          title: contentAnalysis.title,
+          topics: contentAnalysis.topics,
+          categories: contentAnalysis.categories,
+          chunkCount: contentAnalysis.chunks.length,
+        },
+      });
+    }
+
+    // Method: Classify existing queries (GEO Framework - NEW)
+    if (method === "classify") {
+      if (!queries || queries.length === 0) {
+        return NextResponse.json(
+          { error: "queries array is required for classification" },
+          { status: 400 }
+        );
+      }
+
+      // Cast to proper type and classify
+      const inputQueries = queries.map((q) => ({
+        ...q,
+        source: q.source as any,
+      }));
+
+      let classifiedQueries = classifyQueries(inputQueries);
+
+      // Optionally score against content if brandUrl provided
+      if (enableMatchRateScoring && brandUrl) {
+        const contentAnalysis = await analyzePageContent(brandUrl);
+        if (contentAnalysis) {
+          classifiedQueries = scoreQueriesAgainstContent(classifiedQueries, contentAnalysis);
+        }
+      }
+
+      return NextResponse.json({ queries: classifiedQueries });
     }
 
     return NextResponse.json(

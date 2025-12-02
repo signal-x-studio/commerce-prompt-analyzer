@@ -494,7 +494,43 @@ export interface BatchCouncilSummary {
 /**
  * Query source - how the query was generated/discovered
  */
-export type QuerySource = "url-generated" | "ai-suggested" | "industry-template" | "custom";
+export type QuerySource = "url-generated" | "ai-suggested" | "industry-template" | "custom" | "content-derived";
+
+/**
+ * User intent classification (from GEO framework)
+ * Describes what action the user wants to take
+ */
+export type UserIntent =
+  | "learn"           // Information seeking
+  | "compare"         // Comparing options
+  | "buy"             // Ready to purchase
+  | "explore"         // Browsing/discovering
+  | "solve"           // Problem solving
+  | "evaluate";       // Evaluating specific options
+
+/**
+ * Funnel stage classification (from GEO framework)
+ * Where the user is in their buying journey
+ */
+export type FunnelStage =
+  | "awareness"       // Just discovering the category
+  | "consideration"   // Actively researching options
+  | "evaluation"      // Narrowing down choices
+  | "purchase"        // Ready to buy
+  | "post-purchase";  // Already bought, seeking support/accessories
+
+/**
+ * Content type classification (from GEO framework)
+ * The type of content the query is seeking
+ */
+export type ContentType =
+  | "how-to"          // Instructional/tutorial content
+  | "product"         // Product information
+  | "news"            // Current events/updates
+  | "informational"   // General information
+  | "comparison"      // Side-by-side comparisons
+  | "review"          // Reviews/ratings
+  | "listicle";       // List-based content (top 10, etc.)
 
 /**
  * A query to test for visibility
@@ -505,6 +541,15 @@ export interface VisibilityQuery {
   source: QuerySource;
   category?: string;     // e.g., "Product Search", "Comparison", "Review"
   selected: boolean;
+
+  // GEO Framework Classifications (optional, populated by advanced analysis)
+  intent?: UserIntent;
+  funnelStage?: FunnelStage;
+  contentType?: ContentType;
+
+  // Content match scoring (when using content-derived queries)
+  matchScore?: number;           // 0-1 semantic similarity to brand content
+  matchedChunks?: string[];      // Content chunks this query matches
 }
 
 /**
@@ -637,4 +682,105 @@ export interface VisibilityTestConfig {
   executionMode: ExecutionMode;
   selectedModel?: LLMModelId;    // For "all-queries-one-model"
   selectedQuery?: string;        // For "one-query-all-models"
+}
+
+// ============================================
+// Advanced Analysis Settings (GEO Framework)
+// ============================================
+
+/**
+ * Advanced analysis options - user toggles for enhanced features
+ */
+export interface AdvancedAnalysisSettings {
+  // Query Classification
+  enableIntentClassification: boolean;    // Classify queries by user intent
+  enableFunnelStageMapping: boolean;      // Map queries to funnel stages
+
+  // Content Analysis
+  enableContentDerivedQueries: boolean;   // Generate queries from brand content
+  enableMatchRateScoring: boolean;        // Score query-content alignment
+
+  // Competitor Analysis
+  enableCompetitorUrlExtraction: boolean; // Extract competitor URLs from citations
+  enableCompetitorBenchmarking: boolean;  // Compare visibility vs competitors
+
+  // Advanced Metrics
+  enableCoverageAnalysis: boolean;        // Analyze funnel/intent coverage gaps
+}
+
+/**
+ * Default settings - conservative defaults, user can enable advanced features
+ */
+export const DEFAULT_ADVANCED_SETTINGS: AdvancedAnalysisSettings = {
+  enableIntentClassification: false,
+  enableFunnelStageMapping: false,
+  enableContentDerivedQueries: false,
+  enableMatchRateScoring: false,
+  enableCompetitorUrlExtraction: false,
+  enableCompetitorBenchmarking: false,
+  enableCoverageAnalysis: false,
+};
+
+/**
+ * Extracted competitor with full analysis
+ */
+export interface ExtractedCompetitor {
+  name: string;
+  domain?: string;
+  url?: string;
+  mentionCount: number;
+  citationCount: number;           // Times cited in grounded sources
+  mentionedInModels: LLMModelId[];
+  averageSentiment: number;        // -1 to 1
+  contexts: string[];              // Mention contexts
+}
+
+/**
+ * Content chunk for match rate analysis
+ */
+export interface ContentChunk {
+  id: string;
+  text: string;
+  source: "title" | "description" | "heading" | "paragraph" | "product" | "category";
+  wordCount: number;
+}
+
+/**
+ * Content analysis result for a brand URL
+ */
+export interface BrandContentAnalysis {
+  url: string;
+  title: string;
+  description: string;
+  pageType: "homepage" | "category" | "product" | "article" | "other";
+  chunks: ContentChunk[];
+  topics: string[];                // Key topics extracted
+  entities: string[];              // Named entities (brands, products, etc.)
+  categories: string[];            // Site categories/navigation
+}
+
+/**
+ * Coverage analysis showing gaps in funnel/intent
+ */
+export interface CoverageAnalysis {
+  byFunnelStage: Record<FunnelStage, {
+    queryCount: number;
+    citationRate: number;
+    queries: string[];
+  }>;
+  byIntent: Record<UserIntent, {
+    queryCount: number;
+    citationRate: number;
+    queries: string[];
+  }>;
+  byContentType: Record<ContentType, {
+    queryCount: number;
+    citationRate: number;
+    queries: string[];
+  }>;
+  gaps: {
+    type: "funnel" | "intent" | "content";
+    value: string;
+    recommendation: string;
+  }[];
 }

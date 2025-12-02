@@ -3,10 +3,27 @@
  *
  * Helps users discover relevant queries to test for brand visibility.
  * Multiple discovery methods: URL scraping, AI suggestions, industry templates.
+ * Enhanced with GEO Framework for content-derived queries and intent classification.
  */
 
 import { GoogleGenAI } from "@google/genai";
-import type { VisibilityQuery, QuerySource } from "../types";
+import type { VisibilityQuery, QuerySource, UserIntent, FunnelStage, ContentType } from "../types";
+import {
+  analyzePageContent,
+  deriveQueriesFromContent,
+  classifyQueries,
+  scoreQueriesAgainstContent,
+  extractTopicsAndEntities,
+  type BrandContentAnalysis,
+} from "./contentAnalysisService";
+
+// Re-export content analysis functions for convenience
+export {
+  analyzePageContent,
+  deriveQueriesFromContent,
+  classifyQueries,
+  scoreQueriesAgainstContent,
+};
 
 // ============================================
 // Page Content Fetching
