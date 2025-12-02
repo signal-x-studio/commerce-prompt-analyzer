@@ -15,6 +15,7 @@ import { useCost } from "../../context/CostContext";
 import { CostDisplay } from "../../components/CostDisplay";
 import { QueryResultCard } from "../../components/visibility/QueryResultCard";
 import { CostOptimizationTips } from "../../components/visibility/CostOptimizationTips";
+import { ApiKeyWarning } from "../../components/visibility/ApiKeyWarning";
 
 // ============================================
 // Main Page Component
@@ -207,6 +208,9 @@ export default function VisibilityPage() {
         </header>
 
         <main className="space-y-6">
+          {/* API Key Warning */}
+          <ApiKeyWarning />
+
           {/* Mock Mode Toggle */}
           <div className="flex justify-end">
             <label className="inline-flex items-center cursor-pointer">

@@ -43,6 +43,13 @@ export function QueryResultCard({
       return acc;
     }, [] as CompetitorMention[]);
 
+  // Count errors
+  const errorCount = Object.values(modelResults).filter(
+    (r) => r.status === "error"
+  ).length;
+  const hasErrors = errorCount > 0;
+  const allErrors = errorCount === Object.keys(modelResults).length;
+
   const getStatusColor = (rate: number) => {
     if (rate >= 50) return "bg-green-100 text-green-700 border-green-200";
     if (rate > 0) return "bg-amber-100 text-amber-700 border-amber-200";
@@ -65,7 +72,17 @@ export function QueryResultCard({
             <p className="text-sm font-medium text-slate-800 truncate">
               {queryText}
             </p>
-            {allCompetitors.length > 0 && !isExpanded && (
+            {hasErrors && !isExpanded && (
+              <p className="text-xs text-red-500 mt-1 flex items-center gap-1">
+                <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
+                  <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+                </svg>
+                {allErrors
+                  ? "All models failed - check API key configuration"
+                  : `${errorCount} model${errorCount > 1 ? "s" : ""} failed`}
+              </p>
+            )}
+            {allCompetitors.length > 0 && !isExpanded && !hasErrors && (
               <p className="text-xs text-slate-500 mt-1">
                 Competitors mentioned: {allCompetitors.slice(0, 3).map((c) => c.name).join(", ")}
                 {allCompetitors.length > 3 && ` +${allCompetitors.length - 3} more`}
@@ -106,6 +123,7 @@ export function QueryResultCard({
           <div className="flex overflow-x-auto border-b border-slate-200 bg-slate-50">
             {Object.entries(modelResults).map(([modelId, result]) => {
               const model = LLM_MODELS[modelId as LLMModelId];
+              const isError = result.status === "error";
               return (
                 <button
                   key={modelId}
@@ -120,10 +138,19 @@ export function QueryResultCard({
                 >
                   <span
                     className={`inline-block w-2 h-2 rounded-full mr-2 ${
-                      result.found ? "bg-green-500" : "bg-red-400"
+                      isError
+                        ? "bg-yellow-500"
+                        : result.found
+                        ? "bg-green-500"
+                        : "bg-red-400"
                     }`}
                   />
                   {model?.name || modelId}
+                  {isError && (
+                    <span className="ml-1 text-yellow-600" title="API Error">
+                      ⚠
+                    </span>
+                  )}
                 </button>
               );
             })}
@@ -132,7 +159,45 @@ export function QueryResultCard({
           {/* Selected Model Details */}
           {selectedModelResult && (
             <div className="p-4 space-y-4">
+              {/* Error State */}
+              {selectedModelResult.status === "error" && (
+                <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+                  <div className="flex items-start gap-3">
+                    <div className="p-1 bg-red-100 rounded-full">
+                      <svg
+                        className="w-5 h-5 text-red-600"
+                        fill="none"
+                        stroke="currentColor"
+                        viewBox="0 0 24 24"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={2}
+                          d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"
+                        />
+                      </svg>
+                    </div>
+                    <div>
+                      <h4 className="text-sm font-semibold text-red-800">
+                        API Error
+                      </h4>
+                      <p className="text-sm text-red-700 mt-1">
+                        {selectedModelResult.error || "Failed to query this model"}
+                      </p>
+                      {selectedModelResult.error?.includes("not configured") && (
+                        <p className="text-xs text-red-600 mt-2">
+                          This usually means the API key for this provider is missing.
+                          Add the required environment variable to your deployment.
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              )}
+
               {/* Detection Status */}
+              {selectedModelResult.status !== "error" && (
               <div className="flex items-center gap-4">
                 <div
                   className={`px-3 py-1 rounded-full text-sm font-medium ${
@@ -161,6 +226,7 @@ export function QueryResultCard({
                   {Math.round(selectedModelResult.confidence * 100)}% confidence
                 </div>
               </div>
+              )}
 
               {/* Detection Details */}
               {selectedModelResult.detectionDetails && (
