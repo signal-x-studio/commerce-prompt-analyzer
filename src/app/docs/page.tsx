@@ -10,6 +10,7 @@ import Link from "next/link";
 const sections = [
   { id: "overview", title: "Overview" },
   { id: "concepts", title: "Core Concepts" },
+  { id: "advanced", title: "Advanced Analysis" },
   { id: "metrics", title: "Metrics & Scoring" },
   { id: "detection", title: "Detection Logic" },
   { id: "platforms", title: "AI Platforms" },
@@ -124,6 +125,24 @@ export default function DocsPage() {
 
                 <div className="space-y-6">
                   <div>
+                    <h3 className="text-lg font-semibold text-slate-800 mb-2">The GEO Framework</h3>
+                    <p className="text-slate-600 mb-3">
+                      This tool is built on the <strong>Generative Engine Optimization (GEO)</strong> framework,
+                      which helps you understand not just <em>if</em> you&apos;re being cited, but <em>why</em> and <em>where</em>
+                      in the customer journey.
+                    </p>
+                    <div className="bg-indigo-50 border border-indigo-200 rounded-lg p-4 mb-4">
+                      <h4 className="font-semibold text-indigo-800 mb-2">Key GEO Principles</h4>
+                      <ul className="text-sm text-indigo-700 space-y-1">
+                        <li>• <strong>Work backwards from content</strong> — Generate queries based on what your content actually covers</li>
+                        <li>• <strong>Classify by intent</strong> — Understand what users are trying to accomplish</li>
+                        <li>• <strong>Map to funnel stages</strong> — See where you have visibility gaps in the buyer journey</li>
+                        <li>• <strong>Score content alignment</strong> — Measure how well your content matches user queries</li>
+                      </ul>
+                    </div>
+                  </div>
+
+                  <div>
                     <h3 className="text-lg font-semibold text-slate-800 mb-2">Brand Visibility vs. Traditional SEO</h3>
                     <p className="text-slate-600 mb-3">
                       Traditional SEO measures your ranking in search engine results pages (SERPs).
@@ -224,6 +243,148 @@ export default function DocsPage() {
                           <li>• Extracts surrounding context</li>
                         </ul>
                       </div>
+                    </div>
+                  </div>
+                </div>
+              </section>
+
+              {/* Advanced Analysis Section */}
+              <section id="advanced" className="mb-12">
+                <h2 className="text-2xl font-bold text-slate-800 mb-4">Advanced Analysis (GEO Framework)</h2>
+
+                <p className="text-slate-600 mb-4">
+                  Enable advanced features in the &quot;Advanced Analysis&quot; panel to unlock deeper insights
+                  into your brand visibility. All features are off by default and can be toggled on as needed.
+                </p>
+
+                <div className="space-y-6">
+                  {/* Query Classification */}
+                  <div className="bg-blue-50 border border-blue-200 rounded-lg p-5">
+                    <h3 className="text-lg font-semibold text-blue-800 mb-3 flex items-center gap-2">
+                      <span className="w-3 h-3 bg-blue-500 rounded-full"></span>
+                      Query Classification
+                    </h3>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                      <div className="bg-white rounded-lg p-4 border border-blue-100">
+                        <h4 className="font-medium text-slate-800 mb-2">User Intent</h4>
+                        <p className="text-sm text-slate-600 mb-2">What action is the user trying to take?</p>
+                        <div className="flex flex-wrap gap-1">
+                          {["Learn", "Compare", "Buy", "Explore", "Solve", "Evaluate"].map((intent) => (
+                            <span key={intent} className="px-2 py-0.5 bg-blue-100 text-blue-700 rounded text-xs">
+                              {intent}
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+                      <div className="bg-white rounded-lg p-4 border border-blue-100">
+                        <h4 className="font-medium text-slate-800 mb-2">Funnel Stage</h4>
+                        <p className="text-sm text-slate-600 mb-2">Where is the user in their buying journey?</p>
+                        <div className="flex flex-wrap gap-1">
+                          {["Awareness", "Consideration", "Evaluation", "Purchase", "Post-Purchase"].map((stage) => (
+                            <span key={stage} className="px-2 py-0.5 bg-purple-100 text-purple-700 rounded text-xs">
+                              {stage}
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+
+                    <p className="text-sm text-blue-700">
+                      <strong>How it works:</strong> Click &quot;Classify Queries&quot; to automatically analyze
+                      your queries using rule-based grammar matching and ML classification.
+                    </p>
+                  </div>
+
+                  {/* Content Analysis */}
+                  <div className="bg-green-50 border border-green-200 rounded-lg p-5">
+                    <h3 className="text-lg font-semibold text-green-800 mb-3 flex items-center gap-2">
+                      <span className="w-3 h-3 bg-green-500 rounded-full"></span>
+                      Content Analysis
+                    </h3>
+
+                    <div className="space-y-4">
+                      <div className="bg-white rounded-lg p-4 border border-green-100">
+                        <h4 className="font-medium text-slate-800 mb-2">Content-Derived Queries</h4>
+                        <p className="text-sm text-slate-600 mb-2">
+                          Instead of guessing what queries to test, derive them from your actual content.
+                          The tool analyzes your webpage and generates queries that your content <em>should</em> be cited for.
+                        </p>
+                        <div className="bg-green-50 rounded p-3 text-xs text-green-700">
+                          <strong>Process:</strong> Fetch page → Extract content chunks (headings, paragraphs) →
+                          Analyze topics → Generate relevant conversational queries → Classify by intent/funnel
+                        </div>
+                      </div>
+
+                      <div className="bg-white rounded-lg p-4 border border-green-100">
+                        <h4 className="font-medium text-slate-800 mb-2">Match Rate Scoring</h4>
+                        <p className="text-sm text-slate-600 mb-2">
+                          See how well each query aligns with your actual content. Low match scores indicate
+                          queries your content may not adequately address.
+                        </p>
+                        <div className="flex items-center gap-4 mt-2 text-sm">
+                          <span className="flex items-center gap-1">
+                            <span className="w-3 h-3 bg-green-500 rounded-full"></span> 60%+ High
+                          </span>
+                          <span className="flex items-center gap-1">
+                            <span className="w-3 h-3 bg-amber-500 rounded-full"></span> 30-60% Medium
+                          </span>
+                          <span className="flex items-center gap-1">
+                            <span className="w-3 h-3 bg-red-400 rounded-full"></span> &lt;30% Low
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Competitor Analysis */}
+                  <div className="bg-amber-50 border border-amber-200 rounded-lg p-5">
+                    <h3 className="text-lg font-semibold text-amber-800 mb-3 flex items-center gap-2">
+                      <span className="w-3 h-3 bg-amber-500 rounded-full"></span>
+                      Enhanced Competitor Analysis
+                    </h3>
+
+                    <div className="space-y-4">
+                      <div className="bg-white rounded-lg p-4 border border-amber-100">
+                        <h4 className="font-medium text-slate-800 mb-2">Competitor URL Extraction</h4>
+                        <p className="text-sm text-slate-600">
+                          For search platforms (Gemini, Perplexity), extract competitor URLs from citations.
+                          See which competitor sites are being cited instead of yours.
+                        </p>
+                      </div>
+
+                      <div className="bg-white rounded-lg p-4 border border-amber-100">
+                        <h4 className="font-medium text-slate-800 mb-2">Competitor Benchmarking</h4>
+                        <p className="text-sm text-slate-600">
+                          Compare your visibility score against extracted competitors. The leaderboard shows
+                          your position relative to competitors based on citation count, mention count, and sentiment.
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Coverage Analysis */}
+                  <div className="bg-purple-50 border border-purple-200 rounded-lg p-5">
+                    <h3 className="text-lg font-semibold text-purple-800 mb-3 flex items-center gap-2">
+                      <span className="w-3 h-3 bg-purple-500 rounded-full"></span>
+                      Coverage Analysis
+                    </h3>
+
+                    <p className="text-sm text-purple-700 mb-3">
+                      When enabled, shows a visual breakdown of your query coverage across funnel stages,
+                      user intents, and content types. Identifies gaps where you have no queries or low visibility.
+                    </p>
+
+                    <div className="bg-white rounded-lg p-4 border border-purple-100">
+                      <h4 className="font-medium text-slate-800 mb-2">Gap Detection</h4>
+                      <p className="text-sm text-slate-600 mb-2">
+                        The tool automatically identifies coverage gaps and provides recommendations:
+                      </p>
+                      <ul className="text-xs text-slate-500 space-y-1">
+                        <li>• <strong>Missing funnel stages:</strong> &quot;Add educational content for awareness stage&quot;</li>
+                        <li>• <strong>Low intent coverage:</strong> &quot;Create comparison pages for compare intent&quot;</li>
+                        <li>• <strong>Content type gaps:</strong> &quot;Publish how-to guides for tutorial content&quot;</li>
+                      </ul>
                     </div>
                   </div>
                 </div>
@@ -669,12 +830,24 @@ export default function DocsPage() {
                       a: "Each AI model has different training data, knowledge cutoffs, and response styles. This is exactly why testing across multiple platforms is valuable—it shows where your brand has visibility gaps."
                     },
                     {
+                      q: "What are content-derived queries?",
+                      a: "Instead of guessing what queries to test, content-derived queries analyze your actual webpage content and generate queries that your content should be cited for. This follows the GEO framework principle of 'working backwards' from your content to understand what you should rank for."
+                    },
+                    {
+                      q: "What do the intent and funnel stage tags mean?",
+                      a: "Intent (learn, compare, buy, etc.) describes what action the user wants to take. Funnel stage (awareness, consideration, purchase, etc.) shows where they are in the buying journey. Together, they help you understand which types of queries you're visible for and where you have gaps."
+                    },
+                    {
+                      q: "What is match rate scoring?",
+                      a: "Match rate measures how well a query aligns with your actual content. A high match rate (60%+) means your content directly addresses that query. A low match rate (<30%) means you might not have content that answers that question, even if you want to rank for it."
+                    },
+                    {
                       q: "How often should I run visibility tests?",
                       a: "Monthly testing is a good baseline. Run additional tests after major marketing campaigns, PR events, or product launches to track impact on AI visibility."
                     },
                     {
                       q: "Can I improve my brand's AI visibility?",
-                      a: "Yes! Focus on: (1) Creating high-quality, authoritative content that AI systems can learn from, (2) Getting mentioned on well-indexed sites, (3) Building a strong online presence with consistent branding, (4) Encouraging authentic positive reviews."
+                      a: "Yes! Focus on: (1) Creating high-quality, authoritative content that AI systems can learn from, (2) Getting mentioned on well-indexed sites, (3) Building a strong online presence with consistent branding, (4) Encouraging authentic positive reviews, (5) Using content-derived queries to identify gaps in your content coverage."
                     },
                   ].map((faq, i) => (
                     <details key={i} className="bg-slate-50 rounded-lg">
